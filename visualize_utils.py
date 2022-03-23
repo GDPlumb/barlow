@@ -112,38 +112,31 @@ def feature_visualization(robust_model, group_images, features, feature_id,
             trunc_class_names[index] = caption
 
         images_captions.append(caption)
-        heatmaps_captions.append('activation\n = {:.2f}'.format(
-            features[index, feature_id]))
+
         
     cam_maps = compute_cam(robust_model, images_highest, 
                                    feature_id, layer_name='layer4')        
     images_heatmaps = compute_heatmaps(images_highest.permute(0, 2, 3, 1), 
                                        cam_maps)
-
-    print_with_stars(" Visualizing feature[{:d}] ".format(feature_id))
+    
     if grouping == "label":
         footnote = "model prediction"
     else:
         footnote = "label"
-    title = "Images maximally activating feature[{:d}] in the dataset ({:s} at bottom)".format(feature_id, footnote)
-    show_image_row([images_highest.cpu()], ['images'], tlist=[images_captions], title=title, fontsize=18)
+    title = "Images that most strongly have this Feature ({:s} at bottom)".format(footnote)
+    show_image_row([images_highest.cpu()], [], tlist=[images_captions], title=title, fontsize=18)
     print_class_mapping(trunc_class_names)
-
     
-    title = "Heatmaps for feature[{:d}] in the maximally activating images".format(feature_id)
-    show_image_row([images_heatmaps.cpu()], ['heatmaps'], tlist=[heatmaps_captions], 
+    title = "Heatmaps for this Feature in those images"
+    show_image_row([images_heatmaps.cpu()], [], tlist=[], 
                    title=title, y_offset=-0.4, fontsize=18)
 
     images_attack, features_attack = feature_attack(robust_model, 
                                                     images_highest, 
                                                     feature_id)
-    captions_attack = []
-    for index in range(num_images):
-        captions_attack.append('activation\n = {:.2f}'.format(
-            features_attack[index]))
 
-    title = "Amplifying feature[{:d}] in the maximally activating images".format(feature_id)
-    show_image_row([images_attack.cpu()], ['feature attack'], tlist=[captions_attack], 
+    title = "Amplifying this Feature in those images"
+    show_image_row([images_attack.cpu()], [], tlist=[], 
                    title=title, y_offset=-0.4, fontsize=18)
 
 # Display the most activating images, heatmaps and feature attack 
@@ -161,13 +154,13 @@ def display_images(decision_path, data_loader, model, features,
         
 # Display the failures at a leaf node
 def display_failures(leaf_id, leaf_failure_indices, data_loader, grouping, 
-                     num_images=6, num_rows=1):
+                     num_images=6, num_rows=2):
     dataset = data_loader.dataset
     if grouping == "label":
         footnote = "model prediction"
     else:
         footnote = "label"
-    title = "Random failure samples in leaf[{:d}] ({:s} at bottom)".format(leaf_id, footnote)
+    title = "Errors from this Group ({:s} at bottom)".format(footnote)
 
     image_indices = np.arange(len(data_loader.dataset))
     if len(leaf_failure_indices) > num_images*num_rows:
@@ -196,7 +189,9 @@ def display_failures(leaf_id, leaf_failure_indices, data_loader, grouping,
                 index = dataset.class_indices_dict[caption]
                 images_captions.append(str(index))                
                 trunc_class_names[index] = caption
-        show_image_row([images_failures.cpu()], ['failures'], tlist=[images_captions], 
+        if row != 0:
+            title = ""
+        show_image_row([images_failures.cpu()], [], tlist=[images_captions], 
                        title=title, fontsize=18)
         start = start + num_images
     print_class_mapping(trunc_class_names)
@@ -233,3 +228,5 @@ def show_image_row(xlist, ylist=None, fontsize=12, size=(2.5, 2.5), title="", y_
 #     plt.title('Center Title', loc="center")
 #     plt.set_title('Manual y', y=1.0, pad=-14)
     plt.show()
+    print()
+    print('split_token')
