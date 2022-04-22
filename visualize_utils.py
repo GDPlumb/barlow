@@ -1,4 +1,6 @@
 import torch as ch
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import matplotlib.pyplot as plt
 import numpy as np
 from standard_utils import *
 
@@ -89,6 +91,7 @@ def compute_heatmaps(imgs, masks):
 # and 'group_images'
 def feature_visualization(robust_model, group_images, features, feature_id,
                           data_loader, grouping, num_images=6):
+        
     dataset = data_loader.dataset
     sorted_indices = np.argsort(features[:, feature_id])
     indices_high = sorted_indices[-num_images:]
@@ -119,25 +122,31 @@ def feature_visualization(robust_model, group_images, features, feature_id,
     images_heatmaps = compute_heatmaps(images_highest.permute(0, 2, 3, 1), 
                                        cam_maps)
     
+    images = []
+    
     if grouping == "label":
         footnote = "model prediction"
     else:
         footnote = "label"
     title = "Images that most strongly have this Feature ({:s} at bottom)".format(footnote)
-    show_image_row([images_highest.cpu()], [], tlist=[images_captions], title=title, fontsize=18)
-    print_class_mapping(trunc_class_names)
+    img = show_image_row([images_highest.cpu()], [], tlist=[images_captions], title=title, fontsize=18)
+    images.append(img)
+    #print_class_mapping(trunc_class_names)
     
     title = "Heatmaps for this Feature in those images"
-    show_image_row([images_heatmaps.cpu()], [], tlist=[], 
+    img = show_image_row([images_heatmaps.cpu()], [], tlist=[], 
                    title=title, y_offset=-0.4, fontsize=18)
+    images.append(img)
 
     images_attack, features_attack = feature_attack(robust_model, 
                                                     images_highest, 
                                                     feature_id)
 
     title = "Amplifying this Feature in those images"
-    show_image_row([images_attack.cpu()], [], tlist=[], 
+    img = show_image_row([images_attack.cpu()], [], tlist=[], 
                    title=title, y_offset=-0.4, fontsize=18)
+    images.append(img)
+    return images
 
 # Display the most activating images, heatmaps and feature attack 
 # images for a decision_path
@@ -171,6 +180,7 @@ def display_failures(leaf_id, leaf_failure_indices, data_loader, grouping,
     
     image_indices_failures = image_indices[leaf_select_failures]
 
+    images = []
     trunc_class_names = {}
     start = 0
     for row in range(num_rows):
@@ -191,10 +201,11 @@ def display_failures(leaf_id, leaf_failure_indices, data_loader, grouping,
                 trunc_class_names[index] = caption
         if row != 0:
             title = ""
-        show_image_row([images_failures.cpu()], [], tlist=[images_captions], 
-                       title=title, fontsize=18)
+        img = show_image_row([images_failures.cpu()], [], tlist=[images_captions], title=title, fontsize=18)
+        images.append(img)
         start = start + num_images
-    print_class_mapping(trunc_class_names)
+    #print_class_mapping(trunc_class_names)
+    return images
     
 def get_axis(axarr, H, W, i, j):
     H, W = H - 1, W - 1
@@ -207,7 +218,7 @@ def get_axis(axarr, H, W, i, j):
     return ax
         
 # Show image row using images specified in xlist
-def show_image_row(xlist, ylist=None, fontsize=12, size=(2.5, 2.5), title="", y_offset=-0.2, tlist=None, filename=None):
+def show_image_row(xlist, ylist=None, fontsize=12, size=(2.5, 2.5), title="", y_offset=-0.2, tlist=None):
     H, W = len(xlist), len(xlist[0])
     fig, axarr = plt.subplots(H, W, figsize=(size[0] * W, size[1] * H))
     for w in range(W):
@@ -222,11 +233,10 @@ def show_image_row(xlist, ylist=None, fontsize=12, size=(2.5, 2.5), title="", y_
                 ax.set_ylabel(ylist[h], fontsize=fontsize)
             if tlist:
                 ax.set_title(tlist[h][w], y=y_offset, fontsize=fontsize)
-    if filename is not None:
-        plt.savefig(filename, bbox_inches='tight')
     plt.suptitle(title, fontsize=16)
-#     plt.title('Center Title', loc="center")
-#     plt.set_title('Manual y', y=1.0, pad=-14)
-    plt.show()
-    print()
-    print('split_token')
+    canvas = FigureCanvas(fig)
+    canvas.draw()
+    plt.close()
+    image = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    return image
