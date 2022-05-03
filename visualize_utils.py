@@ -172,23 +172,28 @@ def display_failures(leaf_id, leaf_failure_indices, data_loader, grouping,
     title = "Errors from this Group ({:s} at bottom)".format(footnote)
 
     image_indices = np.arange(len(data_loader.dataset))
-    if len(leaf_failure_indices) > num_images*num_rows:
-        replace = False
+    if len(leaf_failure_indices) <= num_images*num_rows:
+        # more images to show than leaves
+        leaf_select_failures = leaf_failure_indices
     else:
-        replace = True
-    leaf_select_failures = np.random.choice(leaf_failure_indices, num_images*num_rows, replace=replace)
+        # sample without replacement
+        leaf_select_failures = np.random.choice(leaf_failure_indices, num_images*num_rows, replace=False)
     
     image_indices_failures = image_indices[leaf_select_failures]
 
     images = []
     trunc_class_names = {}
     start = 0
-    for row in range(num_rows):
+    row = 0
+    while (row < num_rows) and (start < len(leaf_failure_indices)):
         image_indices_select = image_indices_failures[start: start + num_images]
         images_failures, labels_failures, preds_failures = load_images(image_indices_select, data_loader)
         
         images_captions = []
-        for i in range(num_images):
+        
+        n_this_row = len(image_indices_select)
+        
+        for i in range(n_this_row):
             if grouping == "label":
                 caption = preds_failures[i]
             else:
@@ -201,9 +206,18 @@ def display_failures(leaf_id, leaf_failure_indices, data_loader, grouping,
                 trunc_class_names[index] = caption
         if row != 0:
             title = ""
-        img = show_image_row([images_failures.cpu()], [], tlist=[images_captions], title=title, fontsize=18)
+        
+        # If needed, append blank images to [images_failures] in order to fill out the grid
+        n_blank = num_images - n_this_row
+        if n_blank > 0:
+            images_failures = ch.cat((images_failures, ch.ones((n_blank, images_failures.shape[1], images_failures.shape[2], images_failures.shape[3]))), dim=0)
+            images_captions.extend(['' for n in range(n_blank)])
+        
+        img = show_image_row([images_failures], [], tlist=[images_captions], title=title, fontsize=18)
         images.append(img)
         start = start + num_images
+        row += 1
+          
     #print_class_mapping(trunc_class_names)
     return images
     
